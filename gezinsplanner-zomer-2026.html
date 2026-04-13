@@ -6,7 +6,7 @@
 <title>Gezinsplanner Zomer 2026</title>
 
 <!-- Microsoft Authentication Library (MSAL) -->
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
 
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -378,24 +378,36 @@ let fileId = null; // OneDrive file ID, cached after first lookup
 let saveTimer = null;
 
 // ── MSAL SETUP ───────────────────────────────────────────────────
-function initMsal() {
-  msalInstance = new msal.PublicClientApplication({
+async function initMsal() {
+  const msalConfig = {
     auth: {
       clientId: CONFIG.clientId,
-      authority: 'https://login.microsoftonline.com/common',
-      redirectUri: window.location.href.split('?')[0],
+      authority: 'https://login.microsoftonline.com/consumers',
+      redirectUri: window.location.href.split('?')[0].split('#')[0],
     },
     cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false },
-  });
-
-  msalInstance.handleRedirectPromise().then(response => {
+  };
+  try {
+    if (msal.PublicClientApplication.createPublicClientApplication) {
+      msalInstance = await msal.PublicClientApplication.createPublicClientApplication(msalConfig);
+    } else {
+      msalInstance = new msal.PublicClientApplication(msalConfig);
+      await msalInstance.initialize();
+    }
+  } catch(e) {
+    msalInstance = new msal.PublicClientApplication(msalConfig);
+  }
+  try {
+    const response = await msalInstance.handleRedirectPromise();
     if (response) currentAccount = response.account;
     const accounts = msalInstance.getAllAccounts();
     if (accounts.length > 0) {
       currentAccount = accounts[0];
       onSignedIn();
     }
-  }).catch(err => showSync('Inlogfout: ' + err.message, 'error'));
+  } catch(err) {
+    showSync('Inlogfout: ' + err.message, 'error');
+  }
 }
 
 async function getToken() {

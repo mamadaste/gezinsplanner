@@ -453,7 +453,6 @@ select:focus, input:focus { outline:none; border-color:var(--accent); box-shadow
     <div class="leg"><div class="sq" style="background:var(--ct-sport)"></div>Sport</div>
   </div>
   <div class="ctrl-r">
-    <button onclick="clearAll()">Alles wissen</button>
     <button class="pri" onclick="window.print()">⬇ PDF opslaan</button>
   </div>
 </div>
@@ -561,6 +560,12 @@ const FIRST_WK = 23, LAST_WK = 39;
 const PERSON_COLORS = ['#F0522A','#0EA5E9','#10B981','#A855F7'];
 const TYPE_COLORS = { aanwezig:'#10B981',weg:'#F0522A',vakantie:'#0EA5E9',school:'#F59E0B',werk:'#6B7280',sport:'#A855F7',anders:'#EC4899' };
 const TYPE_LABELS = { aanwezig:'Aanwezig',weg:'Weg/elders',vakantie:'Vakantie',school:'School',werk:'Werk',sport:'Sport/act.',anders:'Anders' };
+
+const TYPE_ICONS = {
+  aanwezig: '🏠', weg: '✈️', vakantie: '🌴',
+  school: '📚', werk: '💼', sport: '⚽', anders: '📌',
+};
+
 const MONTHS_NL = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
 const MONTHS_S  = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
 const DAYS_NL   = ['zo','ma','di','wo','do','vr','za'];
@@ -683,8 +688,27 @@ function render() {
         const evs=eventsOnDate(ds).filter(ev=>ev.persons.includes(pi));
         const tips=[];
         evs.forEach(ev=>{
+          const cc = chipClass(ev,ds);
+          const showLabel = evs.length <= 2 && (cc === 'range-only' || cc === 'range-start');
           const chip=document.createElement('div');
-          chip.className=`chip ${chipClass(ev,ds)}`; chip.style.background=TYPE_COLORS[ev.type]||'#888';
+          chip.className=`chip ${cc}`;
+          chip.style.background=TYPE_COLORS[ev.type]||'#888';
+
+          if (showLabel) {
+            // Show icon + short label inside a styled pill
+            chip.style.height = 'auto';
+            chip.style.borderRadius = '4px';
+            chip.style.padding = '2px 4px';
+            chip.style.display = 'flex';
+            chip.style.alignItems = 'center';
+            chip.style.gap = '3px';
+            chip.style.overflow = 'hidden';
+            const icon = TYPE_ICONS[ev.type] || '•';
+            const label = ev.note || TYPE_LABELS[ev.type] || '';
+            chip.innerHTML = `<span style="font-size:.6rem;line-height:1">${icon}</span>`
+              + `<span style="font-size:.6rem;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52px;line-height:1.3;font-family:Plus Jakarta Sans,sans-serif">${label}</span>`;
+          }
+
           tips.push((ev.note||TYPE_LABELS[ev.type])+(ev.start!==ev.end?` (${fmtShort(ev.start)}–${fmtShort(ev.end)})`:''));
           cell.appendChild(chip);
         });
@@ -770,9 +794,7 @@ function updateNames() {
   persist(); render();
 }
 
-function clearAll() {
-  if(confirm('Wil je de hele planning wissen?')){ events=[]; persist(); render(); }
-}
+
 
 // ── LOGIN ─────────────────────────────────────────────────────────
 function checkCode() {

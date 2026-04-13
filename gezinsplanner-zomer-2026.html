@@ -296,6 +296,123 @@ select:focus, input:focus { outline:none; border-color:var(--accent); box-shadow
   margin-top: 4px;
 }
 
+
+/* ── MOBIEL ── */
+@media (max-width: 768px) {
+
+  /* Header compacter */
+  header {
+    padding: 14px 16px 12px;
+    top: 0;
+  }
+  .hdr-title { font-size: 1.4rem; }
+  .hdr-badge { display: none; }
+
+  /* Controls scrollen horizontaal */
+  .controls {
+    padding: 8px 12px;
+    gap: 10px;
+    top: 58px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  .name-edit { flex-wrap: nowrap; }
+  .name-input { width: 62px; font-size: .7rem; }
+  .legend { display: none; }
+  .ctrl-r { flex-shrink: 0; }
+
+  /* Planner padding */
+  .planner { padding: 12px 8px 80px; }
+
+  /* Maand separator */
+  .month-sep { margin: 18px 0 7px; }
+  .month-sep-name { font-size: .95rem; }
+
+  /* Weekkaart — horizontaal scrollbaar */
+  .wk-card {
+    min-width: unset;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 10px;
+  }
+
+  /* Week header grid — vaste breedte zodat scrollen werkt */
+  .wk-hdr-row {
+    grid-template-columns: 52px repeat(7, minmax(38px, 1fr));
+    min-width: 330px;
+  }
+
+  .wk-num-cell { padding: 5px 6px; }
+  .wk-badge { font-size: .55rem; padding: 2px 5px; border-radius: 4px; }
+  .wk-sub { font-size: .48rem; margin-top: 2px; }
+
+  .day-hdr { padding: 5px 2px 4px; }
+  .dh-dow { font-size: .5rem; letter-spacing: .04em; }
+  .dh-num { font-size: .78rem; }
+  .dh-mo  { font-size: .45rem; padding: 1px 3px; }
+
+  /* Person rows */
+  .person-row {
+    grid-template-columns: 52px repeat(7, minmax(38px, 1fr));
+    min-width: 330px;
+  }
+
+  .row-lbl {
+    padding: 5px 4px 5px 6px;
+    font-size: .62rem;
+    gap: 3px;
+    padding-top: 7px;
+  }
+  .color-pip { width: 3px; height: 12px; }
+
+  .cell {
+    min-height: 32px;
+    padding: 3px 2px;
+    gap: 2px;
+  }
+  .chip { height: 8px; margin: 0 1px; }
+
+  /* Tooltip uitschakelen op mobiel — werkt niet goed met touch */
+  .cell-tooltip { display: none !important; }
+
+  /* Modal fullscreen op mobiel */
+  .overlay { align-items: flex-end; }
+  .modal {
+    border-radius: 20px 20px 0 0;
+    width: 100%;
+    max-height: 85vh;
+    padding: 20px 18px;
+  }
+
+  /* Export bar */
+  .export-bar {
+    padding: 10px 16px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .export-bar span { display: none; }
+  .export-bar button { width: 100%; justify-content: center; }
+
+  /* Login card */
+  .login-card {
+    padding: 36px 24px 32px;
+  }
+  .login-title { font-size: 1.6rem; }
+}
+
+/* Extra smal (iPhone SE e.d.) */
+@media (max-width: 380px) {
+  .wk-hdr-row,
+  .person-row {
+    grid-template-columns: 46px repeat(7, minmax(34px, 1fr));
+    min-width: 290px;
+  }
+  .row-lbl { font-size: .56rem; padding: 5px 2px 5px 4px; }
+  .dh-num { font-size: .7rem; }
+}
+
 </style>
 </head>
 <body>

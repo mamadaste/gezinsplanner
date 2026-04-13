@@ -413,6 +413,43 @@ select:focus, input:focus { outline:none; border-color:var(--accent); box-shadow
   .dh-num { font-size: .7rem; }
 }
 
+
+/* ── SPANNING BARS (meerdaagse events) ── */
+.person-row { position: relative; }
+
+.span-bar {
+  position: absolute;
+  /* Grid: col 1 = label (108px), cols 2-8 = days (each 1fr) */
+  /* We calculate left/width after render using JS grid positions */
+  height: 18px;
+  top: calc(4px + (var(--ev-idx, 0) * 22px));
+  pointer-events: auto;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  overflow: hidden;
+  opacity: .92;
+  transition: opacity .15s, filter .15s;
+  z-index: 2;
+}
+.span-bar:hover { opacity: 1; filter: brightness(1.08); }
+
+.span-bar-icon { font-size: .6rem; line-height: 1; flex-shrink: 0; }
+.span-bar-label {
+  font-size: .6rem; font-weight: 700;
+  color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  line-height: 1;
+}
+
+/* Cells need extra top padding to not overlap with bars */
+.cell {
+  padding-top: 4px;
+}
+
 </style>
 </head>
 <body>
@@ -497,7 +534,7 @@ select:focus, input:focus { outline:none; border-color:var(--accent); box-shadow
     <div class="sect-lbl">Ingepland</div>
     <div class="event-list" id="event-list"></div>
     <div class="add-form">
-      <div class="sect-lbl" style="margin-bottom:10px">Nieuw toevoegen</div>
+      <div class="sect-lbl add-form-title" id="add-form-title" style="margin-bottom:10px">Nieuw toevoegen</div>
       <div class="sect-lbl" style="font-size:.6rem;margin-bottom:6px">Wie</div>
       <div class="person-checks" id="person-checks"></div>
       <div class="form-row">
@@ -533,8 +570,9 @@ select:focus, input:focus { outline:none; border-color:var(--accent); box-shadow
           <input type="date" id="ev-end" min="2026-06-01" max="2026-09-30">
         </div>
       </div>
-      <div style="display:flex;justify-content:flex-end;margin-top:4px">
-        <button class="pri" id="btn-add" onclick="addEvent()" style="padding:8px 18px">+ Toevoegen</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+        <button class="edit-cancel" id="btn-cancel-edit" style="display:none" onclick="cancelEdit()">✕ Annuleren</button>
+        <button class="pri" id="btn-add" onclick="addEvent()" style="padding:8px 18px;margin-left:auto">+ Toevoegen</button>
       </div>
     </div>
   </div>
@@ -658,6 +696,7 @@ function render() {
   for (let wk=FIRST_WK; wk<=LAST_WK; wk++) {
     const monday = getMondayOfWeek(YEAR,wk);
     const days = Array.from({length:7},(_,i)=>{ const d=new Date(monday); d.setDate(monday.getDate()+i); return d; });
+    const dayStrs = days.map(d=>dateStr(d));
     const repMonth = days[2].getMonth();
 
     if (repMonth !== lastMonth) {
@@ -669,56 +708,156 @@ function render() {
     }
 
     const card=document.createElement('div'); card.className='wk-card';
+
+    // Week header
     const hdrRow=document.createElement('div'); hdrRow.className='wk-hdr-row';
-    hdrRow.innerHTML=`<div class="wk-num-cell"><div class="wk-badge">WK ${wk}</div><div class="wk-sub">${fmtShort(dateStr(days[0]))} – ${fmtShort(dateStr(days[6]))}</div></div>`;
+    hdrRow.innerHTML=`<div class="wk-num-cell"><div class="wk-badge">WK ${wk}</div><div class="wk-sub">${fmtShort(dayStrs[0])} – ${fmtShort(dayStrs[6])}</div></div>`;
     days.forEach(d=>{
       const dow=d.getDay();
       hdrRow.innerHTML+=`<div class="day-hdr${(dow===0||dow===6)?' wknd':''}${d.getDate()===1?' new-mo':''}"><span class="dh-dow">${DAYS_NL[dow]}</span><span class="dh-num">${d.getDate()}</span>${d.getDate()===1?`<span class="dh-mo">${MONTHS_S[d.getMonth()]}</span>`:''}</div>`;
     });
     card.appendChild(hdrRow);
 
+    // Person rows
     names.forEach((name,pi)=>{
-      const row=document.createElement('div'); row.className='person-row';
-      row.innerHTML=`<div class="row-lbl"><div class="color-pip" style="background:${PERSON_COLORS[pi]}"></div>${name}</div>`;
+      // Collect all events for this person that touch this week
+      const weekEvs = events.filter(ev => {
+        if (!ev.persons.includes(pi)) return false;
+        // overlaps this week
+        return ev.end >= dayStrs[0] && ev.start <= dayStrs[6];
+      });
+
+      // Separate single-day and multi-day events
+      const singleEvs = weekEvs.filter(ev => ev.start === ev.end);
+      const multiEvs  = weekEvs.filter(ev => ev.start !== ev.end);
+
+      // Build row wrapper (position:relative for overlay bars)
+      const row = document.createElement('div');
+      row.className = 'person-row';
+      row.style.position = 'relative';
+
+      // Label cell
+      row.innerHTML = `<div class="row-lbl"><div class="color-pip" style="background:${PERSON_COLORS[pi]}"></div>${name}</div>`;
+
+      // 7 clickable day cells (for single-day events + click targets)
       days.forEach(d=>{
         const ds=dateStr(d); const dow=d.getDay();
         const cell=document.createElement('div');
         cell.className=`cell${(dow===0||dow===6)?' wknd':''}${d.getDate()===1?' new-mo':''}`;
         cell.onclick=()=>openModal(ds);
-        const evs=eventsOnDate(ds).filter(ev=>ev.persons.includes(pi));
+
+        // Single-day events in this cell
+        const daySingles = singleEvs.filter(ev=>ev.start===ds);
         const tips=[];
-        evs.forEach(ev=>{
-          const cc = chipClass(ev,ds);
-          const showLabel = evs.length <= 2 && (cc === 'range-only' || cc === 'range-start');
+        daySingles.forEach(ev=>{
           const chip=document.createElement('div');
-          chip.className=`chip ${cc}`;
+          chip.className='chip range-only';
           chip.style.background=TYPE_COLORS[ev.type]||'#888';
-
-          if (showLabel) {
-            // Show icon + short label inside a styled pill
-            chip.style.height = 'auto';
-            chip.style.borderRadius = '4px';
-            chip.style.padding = '2px 4px';
-            chip.style.display = 'flex';
-            chip.style.alignItems = 'center';
-            chip.style.gap = '3px';
-            chip.style.overflow = 'hidden';
-            const icon = TYPE_ICONS[ev.type] || '•';
-            const label = ev.note || TYPE_LABELS[ev.type] || '';
-            chip.innerHTML = `<span style="font-size:.6rem;line-height:1">${icon}</span>`
-              + `<span style="font-size:.6rem;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52px;line-height:1.3;font-family:Plus Jakarta Sans,sans-serif">${label}</span>`;
-          }
-
-          tips.push((ev.note||TYPE_LABELS[ev.type])+(ev.start!==ev.end?` (${fmtShort(ev.start)}–${fmtShort(ev.end)})`:''));
+          chip.style.height='auto';
+          chip.style.borderRadius='4px';
+          chip.style.padding='2px 4px';
+          chip.style.display='flex';
+          chip.style.alignItems='center';
+          chip.style.gap='3px';
+          chip.style.overflow='hidden';
+          const icon=TYPE_ICONS[ev.type]||'•';
+          const label=ev.note||TYPE_LABELS[ev.type]||'';
+          chip.innerHTML=`<span style="font-size:.6rem;line-height:1">${icon}</span><span style="font-size:.6rem;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52px;line-height:1.3;font-family:Plus Jakarta Sans,sans-serif">${label}</span>`;
+          tips.push(label);
           cell.appendChild(chip);
         });
+
+        // Space placeholder for multi-day events (keeps cell height consistent)
+        multiEvs.forEach(()=>{
+          const spacer=document.createElement('div');
+          spacer.style.height='18px';
+          spacer.style.flexShrink='0';
+          cell.appendChild(spacer);
+        });
+
         if(tips.length){const tip=document.createElement('div');tip.className='cell-tooltip';tip.textContent=tips.join('\n');cell.appendChild(tip);}
         row.appendChild(cell);
       });
+
       card.appendChild(row);
+
+      // Draw spanning bars for multi-day events AFTER row is in DOM
+      // We use a post-render approach with requestAnimationFrame
+      if (multiEvs.length > 0) {
+        multiEvs.forEach((ev, evIdx) => {
+          // Find start col and end col within this week (clamped)
+          const barStart = Math.max(dayStrs.indexOf(ev.start), 0);
+          const barStartClamped = ev.start < dayStrs[0] ? 0 : dayStrs.indexOf(ev.start);
+          const barEnd   = ev.end > dayStrs[6] ? 6 : dayStrs.indexOf(ev.end);
+
+          const colStart = barStartClamped === -1 ? 0 : barStartClamped;
+          const colEnd   = barEnd === -1 ? 6 : barEnd;
+
+          const isStartOfEvent = ev.start >= dayStrs[0];
+          const isEndOfEvent   = ev.end <= dayStrs[6];
+
+          // Create overlay bar element
+          const bar = document.createElement('div');
+          bar.className = 'span-bar';
+          bar.style.background = TYPE_COLORS[ev.type]||'#888';
+          bar.style.borderRadius = `${isStartOfEvent?'5px':'0'} ${isEndOfEvent?'5px':'0'} ${isEndOfEvent?'5px':'0'} ${isStartOfEvent?'5px':'0'}`;
+          bar.dataset.evId = ev.id;
+          bar.title = (ev.note||TYPE_LABELS[ev.type]) + ` (${fmtShort(ev.start)}–${fmtShort(ev.end)})`;
+          bar.onclick = (e) => { e.stopPropagation(); openModal(ev.start >= dayStrs[0] ? ev.start : dayStrs[0]); };
+
+          // Label on bar
+          const icon  = TYPE_ICONS[ev.type]||'';
+          const label = ev.note || TYPE_LABELS[ev.type] || '';
+          bar.innerHTML = `<span class="span-bar-icon">${icon}</span><span class="span-bar-label">${label}</span>`;
+
+          // Position: use CSS custom properties referencing grid columns
+          // col 1 = label, cols 2-8 = days
+          bar.style.setProperty('--col-start', colStart + 2); // +2 because col1=label
+          bar.style.setProperty('--col-span',  colEnd - colStart + 1);
+          bar.style.setProperty('--ev-idx', evIdx);
+
+          row.appendChild(bar);
+        });
+      }
     });
+
     container.appendChild(card);
   }
+}
+
+
+// ── POSITION SPANNING BARS ────────────────────────────────────────
+// Runs after DOM update to calculate pixel positions from actual cell widths
+function positionSpanBars() {
+  document.querySelectorAll('.person-row').forEach(row => {
+    const bars = row.querySelectorAll('.span-bar');
+    if (!bars.length) return;
+
+    // Get all cells (skip label cell = first child div.row-lbl)
+    const cells = [...row.querySelectorAll('.cell')];
+    if (!cells.length) return;
+
+    const rowRect = row.getBoundingClientRect();
+
+    bars.forEach(bar => {
+      const colStart = parseInt(bar.style.getPropertyValue('--col-start')) - 2; // 0-indexed day
+      const colSpan  = parseInt(bar.style.getPropertyValue('--col-span'));
+      const colEnd   = colStart + colSpan - 1;
+
+      if (colStart < 0 || colStart >= cells.length) return;
+      const startCell = cells[Math.max(0, colStart)];
+      const endCell   = cells[Math.min(colEnd, cells.length-1)];
+
+      const startRect = startCell.getBoundingClientRect();
+      const endRect   = endCell.getBoundingClientRect();
+
+      const left  = startRect.left - rowRect.left;
+      const width = endRect.right - startRect.left - 3; // 3px gap
+
+      bar.style.left  = left + 2 + 'px';
+      bar.style.width = width - 4 + 'px';
+    });
+  });
 }
 
 // ── MODAL ─────────────────────────────────────────────────────────
@@ -742,6 +881,8 @@ function buildPersonChecks() {
   });
 }
 
+let editingId = null;
+
 function refreshEventList() {
   const list=document.getElementById('event-list');
   const dayEvs=[...eventsOnDate(modalDate)].sort((a,b)=>a.start.localeCompare(b.start));
@@ -750,10 +891,67 @@ function refreshEventList() {
   dayEvs.forEach(ev=>{
     const who=ev.persons.map(pi=>names[pi]).join(', ');
     const range=ev.start!==ev.end?`${fmtShort(ev.start)} – ${fmtShort(ev.end)}`:'';
-    const item=document.createElement('div'); item.className='event-item';
-    item.innerHTML=`<div class="ev-pip" style="background:${TYPE_COLORS[ev.type]||'#888'}"></div><div class="ev-info"><div class="ev-who">${who} · <span style="font-weight:500;color:var(--ink2)">${TYPE_LABELS[ev.type]||ev.type}</span></div><div class="ev-sub">${[ev.note,range].filter(Boolean).join(' · ')}</div></div><button class="ev-del" onclick="deleteEvent('${ev.id}')">✕</button>`;
+    const item=document.createElement('div');
+    item.className='event-item' + (editingId===ev.id ? ' editing-item' : '');
+    item.innerHTML=`
+      <div class="ev-pip" style="background:${TYPE_COLORS[ev.type]||'#888'}"></div>
+      <div class="ev-info">
+        <div class="ev-who">${who} · <span style="font-weight:500;color:var(--ink2)">${TYPE_LABELS[ev.type]||ev.type}</span></div>
+        <div class="ev-sub">${[ev.note,range].filter(Boolean).join(' · ')}</div>
+      </div>
+      <button class="ev-edit" onclick="startEdit('${ev.id}')" title="Bewerken">✏️</button>
+      <button class="ev-del" onclick="deleteEvent('${ev.id}')" title="Verwijderen">✕</button>`;
     list.appendChild(item);
   });
+}
+
+function startEdit(id) {
+  const ev = events.find(e=>e.id===id);
+  if (!ev) return;
+  editingId = id;
+
+  // Fill form with existing values
+  document.getElementById('ev-type').value = ev.type;
+  document.getElementById('ev-note').value = ev.note || '';
+  document.getElementById('ev-start').value = ev.start;
+  document.getElementById('ev-end').value = ev.end;
+
+  // Set persons
+  document.querySelectorAll('#person-checks .pcheck').forEach(lbl => {
+    const pi = Number(lbl.querySelector('input').value);
+    const checked = ev.persons.includes(pi);
+    lbl.querySelector('input').checked = checked;
+    lbl.classList.toggle('checked', checked);
+  });
+
+  // Set mode
+  setMode(ev.start !== ev.end ? 'range' : 'single');
+
+  // Update form UI to edit mode
+  document.getElementById('add-form-title').textContent = 'Bewerken';
+  document.querySelector('.add-form').classList.add('editing');
+  document.getElementById('btn-add').textContent = '✓ Opslaan';
+  document.getElementById('btn-cancel-edit').style.display = '';
+
+  refreshEventList();
+
+  // Scroll form into view
+  document.querySelector('.add-form').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function cancelEdit() {
+  editingId = null;
+  document.getElementById('add-form-title').textContent = 'Nieuw toevoegen';
+  document.querySelector('.add-form').classList.remove('editing');
+  document.getElementById('btn-add').textContent = '+ Toevoegen';
+  document.getElementById('btn-cancel-edit').style.display = 'none';
+  document.getElementById('ev-note').value = '';
+  document.getElementById('ev-type').value = 'aanwezig';
+  document.querySelectorAll('#person-checks .pcheck').forEach(l=>{
+    l.querySelector('input').checked=false; l.classList.remove('checked');
+  });
+  setMode('single');
+  refreshEventList();
 }
 
 function setMode(mode) {
@@ -779,14 +977,24 @@ function addEvent() {
   const end=inputMode==='range'?document.getElementById('ev-end').value:start;
   if(!start){alert('Vul een datum in.');return;}
   if(end<start){alert('Einddatum mag niet vóór de startdatum liggen.');return;}
-  events.push({id:uid(),persons:pis,type,note,start,end});
+
+  if (editingId) {
+    // Update existing event
+    const idx = events.findIndex(e=>e.id===editingId);
+    if (idx > -1) events[idx] = { ...events[idx], persons:pis, type, note, start, end };
+    cancelEdit();
+  } else {
+    // Add new event
+    events.push({id:uid(),persons:pis,type,note,start,end});
+    document.querySelectorAll('#person-checks .pcheck').forEach(l=>{l.querySelector('input').checked=false;l.classList.remove('checked');});
+    document.getElementById('ev-note').value='';
+  }
+
   persist(); render(); refreshEventList();
-  document.querySelectorAll('#person-checks .pcheck').forEach(l=>{l.querySelector('input').checked=false;l.classList.remove('checked');});
-  document.getElementById('ev-note').value='';
 }
 
 function deleteEvent(id) { events=events.filter(e=>e.id!==id); persist(); render(); refreshEventList(); }
-function closeModal() { document.getElementById('modal').classList.remove('open'); modalDate=null; }
+function closeModal() { document.getElementById('modal').classList.remove('open'); modalDate=null; if(editingId) cancelEdit(); }
 document.getElementById('modal').addEventListener('click',e=>{ if(e.target===document.getElementById('modal')) closeModal(); });
 
 function updateNames() {
@@ -817,6 +1025,8 @@ function checkCode() {
     setTimeout(() => { errorEl.style.display = 'none'; }, 4000);
   }
 }
+
+window.addEventListener("resize", positionSpanBars);
 
 function attachLoginListeners() {
   const btn = document.getElementById('login-btn');

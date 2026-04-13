@@ -5,9 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gezinsplanner Zomer 2026</title>
 
-<!-- Microsoft Authentication Library (MSAL) -->
-<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/lib/msal-browser.min.js"></script>
-
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
@@ -48,22 +45,6 @@ header {
 .hdr-right { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .hdr-badge { background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2); border-radius:20px; padding:5px 14px; font-size:.72rem; font-weight:600; color:rgba(255,255,255,.85); }
 
-/* Auth status chip */
-.auth-chip {
-  display:flex; align-items:center; gap:6px;
-  border-radius:20px; padding:5px 12px;
-  font-size:.72rem; font-weight:700; cursor:pointer;
-  border:1px solid rgba(255,255,255,.25);
-  transition:all .2s;
-}
-.auth-chip.signed-out { background:rgba(255,255,255,.15); color:rgba(255,255,255,.9); }
-.auth-chip.signed-out:hover { background:rgba(255,255,255,.25); }
-.auth-chip.signed-in  { background:rgba(16,185,129,.25); border-color:rgba(16,185,129,.5); color:#6EE7B7; }
-.auth-chip.loading    { background:rgba(255,255,255,.1); color:rgba(255,255,255,.5); cursor:default; }
-.auth-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
-.auth-chip.signed-out .auth-dot { background:rgba(255,255,255,.5); }
-.auth-chip.signed-in  .auth-dot { background:#10B981; box-shadow:0 0 6px #10B981; }
-.auth-chip.loading    .auth-dot { background:rgba(255,255,255,.3); }
 
 /* Sync status */
 .sync-bar {
@@ -145,25 +126,6 @@ button:disabled { opacity:.4; cursor:not-allowed; }
 .cell-tooltip::after { content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:5px solid transparent; border-top-color:var(--ink); }
 .cell:hover .cell-tooltip { display:block; }
 
-/* ── LOGIN SCREEN ── */
-.login-screen {
-  display:none; flex-direction:column; align-items:center; justify-content:center;
-  min-height:60vh; gap:24px; padding:40px;
-}
-.login-screen.visible { display:flex; }
-.login-card { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:48px 44px; text-align:center; box-shadow:var(--shadow-lg); max-width:440px; width:100%; }
-.login-icon { font-size:3rem; margin-bottom:16px; }
-.login-card h2 { font-size:1.4rem; font-weight:800; margin-bottom:8px; }
-.login-card p { color:var(--ink3); font-size:.88rem; line-height:1.6; margin-bottom:28px; }
-.btn-ms {
-  display:flex; align-items:center; justify-content:center; gap:10px;
-  background:#0078D4; color:#fff; border:none;
-  padding:12px 28px; border-radius:10px; font-size:.9rem; font-weight:700;
-  cursor:pointer; width:100%; transition:background .15s;
-  box-shadow:0 2px 10px rgba(0,120,212,.3);
-}
-.btn-ms:hover { background:#006CBE; }
-.btn-ms svg { width:20px; height:20px; flex-shrink:0; }
 
 /* ── MODAL ── */
 .overlay { display:none; position:fixed; inset:0; background:rgba(15,21,35,.45); backdrop-filter:blur(6px); z-index:200; align-items:center; justify-content:center; }
@@ -211,12 +173,119 @@ select:focus, input:focus { outline:none; border-color:var(--accent); box-shadow
 .export-bar span { color:var(--ink3); font-size:.72rem; }
 
 @media print {
-  .export-bar,.ctrl-r,.controls,button,.auth-chip,.sync-bar { display:none !important; }
+  .export-bar,.ctrl-r,.controls,button,.sync-bar { display:none !important; }
   body { background:white; }
   .planner { padding:12px; }
   .wk-card { break-inside:avoid; box-shadow:none; border:1px solid #ddd; }
   header { position:static; background:#1E3A8A !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 }
+
+/* ── LOGIN SCREEN ── */
+.login-screen {
+  display: none;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: linear-gradient(145deg, #EEF2FF 0%, #F0F4FF 50%, #E8F4FF 100%);
+}
+.login-screen.visible { display: flex; }
+
+.login-card {
+  background: var(--surface);
+  border-radius: 24px;
+  padding: 48px 44px 44px;
+  width: min(420px, 100%);
+  box-shadow: 0 20px 60px rgba(79,110,247,.15), 0 4px 20px rgba(0,0,0,.08);
+  border: 1px solid rgba(79,110,247,.12);
+  text-align: center;
+}
+
+.login-logo {
+  width: 72px; height: 72px;
+  background: linear-gradient(135deg, #4F6EF7, #6366F1);
+  border-radius: 20px;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 20px;
+  box-shadow: 0 8px 24px rgba(79,110,247,.35);
+}
+.login-logo-icon { font-size: 2rem; line-height: 1; }
+
+.login-eyebrow {
+  font-size: .7rem; font-weight: 800;
+  letter-spacing: .18em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 6px;
+}
+
+.login-title {
+  font-size: 2rem; font-weight: 800;
+  color: var(--ink); line-height: 1;
+  letter-spacing: -1px; margin-bottom: 10px;
+}
+.login-title span { color: var(--accent); }
+
+.login-sub {
+  font-size: .84rem; color: var(--ink3);
+  line-height: 1.6; margin-bottom: 28px;
+}
+
+.login-input-wrap {
+  position: relative;
+  margin-bottom: 12px;
+}
+.login-input-icon {
+  position: absolute; left: 14px; top: 50%;
+  transform: translateY(-50%);
+  font-size: 1rem; pointer-events: none;
+}
+.login-input {
+  width: 100%;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: .9rem; font-weight: 500;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 13px 16px 13px 42px;
+  background: var(--surface2);
+  color: var(--ink);
+  transition: all .2s;
+  outline: none;
+  letter-spacing: .08em;
+}
+.login-input:focus {
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 4px rgba(79,110,247,.12);
+}
+.login-input.error { border-color: #EF4444; box-shadow: 0 0 0 4px rgba(239,68,68,.1); }
+
+.login-btn {
+  width: 100%;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: linear-gradient(135deg, #4F6EF7, #6366F1);
+  color: #fff; border: none;
+  padding: 14px 24px; border-radius: 12px;
+  font-size: .9rem; font-weight: 800;
+  cursor: pointer; letter-spacing: .02em;
+  box-shadow: 0 4px 16px rgba(79,110,247,.4);
+  transition: all .2s;
+  margin-bottom: 14px;
+}
+.login-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(79,110,247,.45);
+}
+.login-btn:active { transform: translateY(0); }
+
+.login-error {
+  display: none;
+  font-size: .76rem; font-weight: 500;
+  color: #DC2626;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
 </style>
 </head>
 <body>
@@ -228,10 +297,7 @@ select:focus, input:focus { outline:none; border-color:var(--accent); box-shadow
   </div>
   <div class="hdr-right">
     <div class="hdr-badge">Week 23 – 39 · jun – sep</div>
-    <div class="auth-chip signed-out" id="auth-chip" onclick="handleAuthClick()">
-      <div class="auth-dot"></div>
-      <span id="auth-label">Inloggen met Microsoft</span>
-    </div>
+
   </div>
 </header>
 
@@ -268,16 +334,24 @@ select:focus, input:focus { outline:none; border-color:var(--accent); box-shadow
 <!-- Login screen -->
 <div class="login-screen visible" id="login-screen">
   <div class="login-card">
-    <div class="login-icon">🗓️</div>
-    <h2>Gezinsplanner Zomer 2026</h2>
-    <p>Log in met je Microsoft-account om de gedeelde gezinsplanning te bekijken en bij te werken. De planning wordt automatisch gesynchroniseerd voor alle gezinsleden.</p>
-    <button class="btn-ms" onclick="handleAuthClick()">
-      <svg viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg" fill="white">
-        <rect x="1" y="1" width="9" height="9"/><rect x="11" y="1" width="9" height="9"/>
-        <rect x="1" y="11" width="9" height="9"/><rect x="11" y="11" width="9" height="9"/>
-      </svg>
-      Inloggen met Microsoft
+    <div class="login-logo">
+      <div class="login-logo-icon">☀️</div>
+    </div>
+    <div class="login-eyebrow">Gezinsplanner</div>
+    <h2 class="login-title">Zomer <span>2026</span></h2>
+    <p class="login-sub">Voer de gezinscode in om de planning te bekijken en bij te werken.</p>
+    <div class="login-input-wrap">
+      <div class="login-input-icon">🔑</div>
+      <input type="password" id="code-input" class="login-input" placeholder="Gezinscode invoeren…"
+        onkeydown="if(event.key==='Enter')checkCode()">
+    </div>
+    <button class="login-btn" onclick="checkCode()">
+      Doorgaan
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
+    <div id="code-error" class="login-error">
+      Onjuiste code — vraag de code op via de gezinsgroep 💬
+    </div>
   </div>
 </div>
 
@@ -345,19 +419,36 @@ select:focus, input:focus { outline:none; border-color:var(--accent); box-shadow
   <span>Kies "Opslaan als PDF" in het printdialoog — of maak een screenshot om te delen in WhatsApp.</span>
 </div>
 
+<script src="config.js"></script>
+
 <script>
 // ══════════════════════════════════════════════════════════════════
-//  ⚙️  CONFIGURATIE — vul dit in na de Azure app-registratie
+//  ⚙️  VASTE CONFIGURATIE (niet wijzigen)
 // ══════════════════════════════════════════════════════════════════
 const CONFIG = {
-  // Stap 1: Plak hier jouw Azure Application (client) ID
-  clientId: '86b56a5d-e0c9-4a08-adfc-26cd37352341',
+  githubUser: 'mamadaste',
+  githubRepo: 'gezinsplanner',
+  githubFile: 'planning.json',
+  // familyCode en githubToken komen uit config.js
+  ...window.GP_CONFIG,
+};
+// ══════════════════════════════════════════════════════════════════
+const CONFIG = {
+  // Jouw GitHub gebruikersnaam
+  githubUser: 'mamadaste',
 
-  // Stap 2: Plak hier de naam van je OneDrive-map (exact zoals aangemaakt)
-  onedriveFolderName: 'Gezinsplanner',
+  // Naam van je GitHub repository
+  githubRepo: 'gezinsplanner',
 
-  // Stap 3: Naam van het Excel-bestand (niet wijzigen tenzij je het anders noemt)
-  excelFileName: 'planning.json',
+  // Naam van het planningsbestand in de repository (niet wijzigen)
+  githubFile: 'planning.json',
+
+  // REGEL 362 — Kies hier een toegangscode voor het gezin (deel via WhatsApp)
+  familyCode: 'KIES_EEN_CODE',
+
+  // Plak hier jouw GitHub Personal Access Token (begint met ghp_...)
+  // REGEL 362 — pas alleen de waarde tussen de aanhalingstekens aan
+  githubToken: 'JOUW_GITHUB_TOKEN_HIER',
 };
 // ══════════════════════════════════════════════════════════════════
 
@@ -373,110 +464,25 @@ const DAYS_NL   = ['zo','ma','di','wo','do','vr','za'];
 let names = ['Papa','Mama','Kind 1','Kind 2'];
 let events = [];
 let modalDate = null, inputMode = 'single';
-let msalInstance = null, currentAccount = null;
-let fileId = null; // OneDrive file ID, cached after first lookup
+// ── GITHUB STORAGE ───────────────────────────────────────────────
+let fileSha = null; // GitHub requires the file SHA to update it
 let saveTimer = null;
 
-// ── MSAL SETUP ───────────────────────────────────────────────────
-async function initMsal() {
-  const msalConfig = {
-    auth: {
-      clientId: CONFIG.clientId,
-      authority: 'https://login.microsoftonline.com/consumers',
-      redirectUri: window.location.href.split('?')[0].split('#')[0],
-    },
-    cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false },
-  };
-  try {
-    if (msal.PublicClientApplication.createPublicClientApplication) {
-      msalInstance = await msal.PublicClientApplication.createPublicClientApplication(msalConfig);
-    } else {
-      msalInstance = new msal.PublicClientApplication(msalConfig);
-      await msalInstance.initialize();
-    }
-  } catch(e) {
-    msalInstance = new msal.PublicClientApplication(msalConfig);
-  }
-  try {
-    const response = await msalInstance.handleRedirectPromise();
-    if (response) currentAccount = response.account;
-    const accounts = msalInstance.getAllAccounts();
-    if (accounts.length > 0) {
-      currentAccount = accounts[0];
-      onSignedIn();
-    }
-  } catch(err) {
-    showSync('Inlogfout: ' + err.message, 'error');
-  }
-}
-
-async function getToken() {
-  const request = {
-    scopes: ['Files.ReadWrite', 'User.Read'],
-    account: currentAccount,
-  };
-  try {
-    const resp = await msalInstance.acquireTokenSilent(request);
-    return resp.accessToken;
-  } catch {
-    const resp = await msalInstance.acquireTokenPopup(request);
-    return resp.accessToken;
-  }
-}
-
-async function handleAuthClick() {
-  if (currentAccount) {
-    // Sign out
-    await msalInstance.logoutPopup({ account: currentAccount });
-    currentAccount = null;
-    onSignedOut();
-  } else {
-    try {
-      const resp = await msalInstance.loginPopup({ scopes: ['Files.ReadWrite','User.Read'] });
-      currentAccount = resp.account;
-      onSignedIn();
-    } catch(e) {
-      showSync('Inloggen mislukt: ' + e.message, 'error');
-    }
-  }
-}
-
-function onSignedIn() {
-  const chip = document.getElementById('auth-chip');
-  chip.className = 'auth-chip signed-in';
-  const name = currentAccount.name || currentAccount.username;
-  document.getElementById('auth-label').textContent = name.split(' ')[0];
-  document.getElementById('login-screen').classList.remove('visible');
-  document.getElementById('controls').style.display = '';
-  document.getElementById('planner').style.display = '';
-  document.getElementById('export-bar').style.display = '';
-  loadFromOneDrive();
-}
-
-function onSignedOut() {
-  const chip = document.getElementById('auth-chip');
-  chip.className = 'auth-chip signed-out';
-  document.getElementById('auth-label').textContent = 'Inloggen met Microsoft';
-  document.getElementById('login-screen').classList.add('visible');
-  document.getElementById('controls').style.display = 'none';
-  document.getElementById('planner').style.display = 'none';
-  document.getElementById('export-bar').style.display = 'none';
-}
-
-// ── ONEDRIVE: LOAD ────────────────────────────────────────────────
-async function loadFromOneDrive() {
+async function loadFromGitHub() {
   showSync('Planning laden…', 'loading');
   try {
-    const token = await getToken();
-    const filePath = `${CONFIG.onedriveFolderName}/${CONFIG.excelFileName}`;
-    const res = await fetch(
-      `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURIComponent(filePath)}:/content`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    const url = `https://api.github.com/repos/${CONFIG.githubUser}/${CONFIG.githubRepo}/contents/${CONFIG.githubFile}`;
+    const res = await fetch(url, {
+      headers: {
+        'Authorization': `token ${CONFIG.githubToken}`,
+        'Accept': 'application/vnd.github.v3+json',
+      }
+    });
 
     if (res.status === 404) {
-      // File doesn't exist yet — start with empty planning
+      // File doesn't exist yet — start empty
       events = [];
+      fileSha = null;
       hideSync();
       render();
       return;
@@ -484,12 +490,13 @@ async function loadFromOneDrive() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const data = await res.json();
-    events = Array.isArray(data.events) ? data.events : [];
-    if (data.names) names = data.names;
-
-    // Sync name inputs
-    names.forEach((n,i) => { const el=document.getElementById('n'+i); if(el) el.value=n; });
-
+    fileSha = data.sha;
+    const decoded = JSON.parse(atob(data.content.replace(/\n/g, '')));
+    events = Array.isArray(decoded.events) ? decoded.events : [];
+    if (decoded.names) {
+      names = decoded.names;
+      names.forEach((n,i) => { const el=document.getElementById('n'+i); if(el) el.value=n; });
+    }
     hideSync();
     render();
   } catch(e) {
@@ -497,34 +504,42 @@ async function loadFromOneDrive() {
   }
 }
 
-// ── ONEDRIVE: SAVE ────────────────────────────────────────────────
 function persist() {
-  // Debounce: save 800ms after last change
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveToOneDrive, 800);
+  saveTimer = setTimeout(saveToGitHub, 800);
 }
 
-async function saveToOneDrive() {
+async function saveToGitHub() {
   showSync('Opslaan…', 'loading');
   try {
-    const token = await getToken();
-    const payload = JSON.stringify({ events, names, savedAt: new Date().toISOString() });
-    const filePath = `${CONFIG.onedriveFolderName}/${CONFIG.excelFileName}`;
+    const payload = { events, names, savedAt: new Date().toISOString() };
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
+    const url = `https://api.github.com/repos/${CONFIG.githubUser}/${CONFIG.githubRepo}/contents/${CONFIG.githubFile}`;
 
-    const res = await fetch(
-      `https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURIComponent(filePath)}:/content`,
-      {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: payload,
-      }
-    );
+    const body = {
+      message: 'Planning bijgewerkt',
+      content: content,
+    };
+    if (fileSha) body.sha = fileSha;
 
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    showSync('✓ Opgeslagen en gesynchroniseerd', 'success');
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `token ${CONFIG.githubToken}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    fileSha = data.content.sha;
+    showSync('✓ Opgeslagen voor het hele gezin', 'success');
     setTimeout(hideSync, 2500);
   } catch(e) {
     showSync('Opslaan mislukt: ' + e.message, 'error');
@@ -684,15 +699,44 @@ function clearAll() {
 }
 
 // ── INIT ──────────────────────────────────────────────────────────
-if (CONFIG.clientId === 'JOUW_CLIENT_ID_HIER') {
+function checkCode() {
+  const input = document.getElementById('code-input').value.trim();
+  document.getElementById('code-input').classList.remove('error');
+  if (input === CONFIG.familyCode) {
+    // Save in sessionStorage so refresh keeps you logged in during same session
+    sessionStorage.setItem('gp_auth', CONFIG.familyCode);
+    showPlanner();
+  } else {
+    document.getElementById('code-error').style.display = 'block';
+    document.getElementById('code-input').classList.add('error');
+  }
+}
+
+function showPlanner() {
+  document.getElementById('login-screen').classList.remove('visible');
+  document.getElementById('controls').style.display = '';
+  document.getElementById('planner').style.display = '';
+  document.getElementById('export-bar').style.display = '';
+  loadFromGitHub();
+}
+
+// Check if setup is complete
+if (!CONFIG.githubToken || !CONFIG.familyCode || CONFIG.githubToken === 'JOUW_GITHUB_TOKEN_HIER' || CONFIG.familyCode === 'KIES_EEN_CODE') {
   document.getElementById('login-screen').innerHTML = `
     <div class="login-card">
       <div class="login-icon">⚙️</div>
       <h2>Nog even instellen</h2>
-      <p>Open het HTML-bestand in een teksteditor en vul jouw <strong>Azure Client ID</strong> in bij <code>CONFIG.clientId</code>.<br><br>Volg de meegeleverde handleiding stap voor stap.</p>
+      <p>Open het HTML-bestand en vul in:<br><br>
+      • <strong>Regel 364:</strong> jouw GitHub Token<br>
+      • <strong>Regel 362:</strong> een gezinscode naar keuze</p>
     </div>`;
+  document.getElementById('login-screen').classList.add('visible');
 } else {
-  initMsal();
+  // Check if already authenticated this session
+  if (sessionStorage.getItem('gp_auth') === CONFIG.familyCode) {
+    showPlanner();
+  }
+  // Otherwise login screen is already visible
 }
 </script>
 </body>

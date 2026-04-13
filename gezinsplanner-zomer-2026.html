@@ -419,38 +419,13 @@ select:focus, input:focus { outline:none; border-color:var(--accent); box-shadow
   <span>Kies "Opslaan als PDF" in het printdialoog — of maak een screenshot om te delen in WhatsApp.</span>
 </div>
 
-<script src="config.js"></script>
-
 <script>
 // ══════════════════════════════════════════════════════════════════
-//  ⚙️  VASTE CONFIGURATIE (niet wijzigen)
+//  ⚙️  CONFIGURATIE — wordt ingeladen via config.js
+//  Pas ALLEEN config.js aan, niet dit bestand.
 // ══════════════════════════════════════════════════════════════════
-const CONFIG = {
-  githubUser: 'mamadaste',
-  githubRepo: 'gezinsplanner',
-  githubFile: 'planning.json',
-  // familyCode en githubToken komen uit config.js
-  ...window.GP_CONFIG,
-};
-// ══════════════════════════════════════════════════════════════════
-const CONFIG = {
-  // Jouw GitHub gebruikersnaam
-  githubUser: 'mamadaste',
-
-  // Naam van je GitHub repository
-  githubRepo: 'gezinsplanner',
-
-  // Naam van het planningsbestand in de repository (niet wijzigen)
-  githubFile: 'planning.json',
-
-  // REGEL 362 — Kies hier een toegangscode voor het gezin (deel via WhatsApp)
-  familyCode: 'KIES_EEN_CODE',
-
-  // Plak hier jouw GitHub Personal Access Token (begint met ghp_...)
-  // REGEL 362 — pas alleen de waarde tussen de aanhalingstekens aan
-  githubToken: 'JOUW_GITHUB_TOKEN_HIER',
-};
-// ══════════════════════════════════════════════════════════════════
+// CONFIG komt van config.js via window.GP_CONFIG
+const CONFIG = window.GP_CONFIG || {};
 
 const YEAR = 2026;
 const FIRST_WK = 23, LAST_WK = 39;
@@ -464,37 +439,27 @@ const DAYS_NL   = ['zo','ma','di','wo','do','vr','za'];
 let names = ['Papa','Mama','Kind 1','Kind 2'];
 let events = [];
 let modalDate = null, inputMode = 'single';
-// ── GITHUB STORAGE ───────────────────────────────────────────────
-let fileSha = null; // GitHub requires the file SHA to update it
 let saveTimer = null;
 
-async function loadFromGitHub() {
+// ── JSONBIN STORAGE ───────────────────────────────────────────────
+// JSONBin API: https://jsonbin.io
+// Alle data wordt opgeslagen in één privé bin op jsonbin.io
+// De bin-ID en API-sleutel staan in config.js
+
+async function loadFromJsonBin() {
   showSync('Planning laden…', 'loading');
   try {
-    const url = `https://api.github.com/repos/${CONFIG.githubUser}/${CONFIG.githubRepo}/contents/${CONFIG.githubFile}`;
-    const res = await fetch(url, {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.jsonBinId}/latest`, {
       headers: {
-        'Authorization': `token ${CONFIG.githubToken}`,
-        'Accept': 'application/vnd.github.v3+json',
+        'X-Master-Key': CONFIG.jsonBinKey,
+        'X-Bin-Meta': 'false',
       }
     });
-
-    if (res.status === 404) {
-      // File doesn't exist yet — start empty
-      events = [];
-      fileSha = null;
-      hideSync();
-      render();
-      return;
-    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
     const data = await res.json();
-    fileSha = data.sha;
-    const decoded = JSON.parse(atob(data.content.replace(/\n/g, '')));
-    events = Array.isArray(decoded.events) ? decoded.events : [];
-    if (decoded.names) {
-      names = decoded.names;
+    events = Array.isArray(data.events) ? data.events : [];
+    if (data.names) {
+      names = data.names;
       names.forEach((n,i) => { const el=document.getElementById('n'+i); if(el) el.value=n; });
     }
     hideSync();
@@ -506,39 +471,22 @@ async function loadFromGitHub() {
 
 function persist() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveToGitHub, 800);
+  saveTimer = setTimeout(saveToJsonBin, 800);
 }
 
-async function saveToGitHub() {
+async function saveToJsonBin() {
   showSync('Opslaan…', 'loading');
   try {
     const payload = { events, names, savedAt: new Date().toISOString() };
-    const content = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
-    const url = `https://api.github.com/repos/${CONFIG.githubUser}/${CONFIG.githubRepo}/contents/${CONFIG.githubFile}`;
-
-    const body = {
-      message: 'Planning bijgewerkt',
-      content: content,
-    };
-    if (fileSha) body.sha = fileSha;
-
-    const res = await fetch(url, {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.jsonBinId}`, {
       method: 'PUT',
       headers: {
-        'Authorization': `token ${CONFIG.githubToken}`,
-        'Accept': 'application/vnd.github.v3+json',
         'Content-Type': 'application/json',
+        'X-Master-Key': CONFIG.jsonBinKey,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
     });
-
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.message || `HTTP ${res.status}`);
-    }
-
-    const data = await res.json();
-    fileSha = data.content.sha;
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     showSync('✓ Opgeslagen voor het hele gezin', 'success');
     setTimeout(hideSync, 2500);
   } catch(e) {
@@ -612,7 +560,8 @@ function render() {
           tips.push((ev.note||TYPE_LABELS[ev.type])+(ev.start!==ev.end?` (${fmtShort(ev.start)}–${fmtShort(ev.end)})`:''));
           cell.appendChild(chip);
         });
-        if(tips.length){const tip=document.createElement('div');tip.className='cell-tooltip';tip.textContent=tips.join('\n');cell.appendChild(tip);}
+        if(tips.length){const tip=document.createElement('div');tip.className='cell-tooltip';tip.textContent=tips.join('
+');cell.appendChild(tip);}
         row.appendChild(cell);
       });
       card.appendChild(row);
@@ -687,7 +636,7 @@ function addEvent() {
 
 function deleteEvent(id) { events=events.filter(e=>e.id!==id); persist(); render(); refreshEventList(); }
 function closeModal() { document.getElementById('modal').classList.remove('open'); modalDate=null; }
-document.getElementById('modal').addEventListener('click',e=>{if(e.target===document.getElementById('modal'))closeModal();});
+document.getElementById('modal').addEventListener('click',e=>{ if(e.target===document.getElementById('modal')) closeModal(); });
 
 function updateNames() {
   ['Papa','Mama','Kind 1','Kind 2'].forEach((def,i)=>{ names[i]=document.getElementById('n'+i).value||def; });
@@ -695,15 +644,14 @@ function updateNames() {
 }
 
 function clearAll() {
-  if(confirm('Wil je de hele planning wissen?')){events=[];persist();render();}
+  if(confirm('Wil je de hele planning wissen?')){ events=[]; persist(); render(); }
 }
 
-// ── INIT ──────────────────────────────────────────────────────────
+// ── LOGIN ─────────────────────────────────────────────────────────
 function checkCode() {
   const input = document.getElementById('code-input').value.trim();
   document.getElementById('code-input').classList.remove('error');
   if (input === CONFIG.familyCode) {
-    // Save in sessionStorage so refresh keeps you logged in during same session
     sessionStorage.setItem('gp_auth', CONFIG.familyCode);
     showPlanner();
   } else {
@@ -717,26 +665,28 @@ function showPlanner() {
   document.getElementById('controls').style.display = '';
   document.getElementById('planner').style.display = '';
   document.getElementById('export-bar').style.display = '';
-  loadFromGitHub();
+  loadFromJsonBin();
 }
 
-// Check if setup is complete
-if (!CONFIG.githubToken || !CONFIG.familyCode || CONFIG.githubToken === 'JOUW_GITHUB_TOKEN_HIER' || CONFIG.familyCode === 'KIES_EEN_CODE') {
+// ── INIT ──────────────────────────────────────────────────────────
+if (!CONFIG.familyCode || !CONFIG.jsonBinKey || !CONFIG.jsonBinId
+    || CONFIG.familyCode === 'KIES_EEN_CODE'
+    || CONFIG.jsonBinKey === 'JOUW_JSONBIN_KEY_HIER'
+    || CONFIG.jsonBinId  === 'JOUW_BIN_ID_HIER') {
   document.getElementById('login-screen').innerHTML = `
     <div class="login-card">
-      <div class="login-icon">⚙️</div>
-      <h2>Nog even instellen</h2>
-      <p>Open het HTML-bestand en vul in:<br><br>
-      • <strong>Regel 364:</strong> jouw GitHub Token<br>
-      • <strong>Regel 362:</strong> een gezinscode naar keuze</p>
+      <div class="login-logo"><div class="login-logo-icon">⚙️</div></div>
+      <div class="login-eyebrow">Actie vereist</div>
+      <h2 class="login-title">Nog even <span>instellen</span></h2>
+      <p class="login-sub">Vul in <strong>config.js</strong> de drie waarden in:<br><br>
+        <strong>familyCode</strong> — gezinswachtwoord<br>
+        <strong>jsonBinKey</strong> — jouw JSONBin API-sleutel<br>
+        <strong>jsonBinId</strong> — jouw JSONBin Bin ID
+      </p>
     </div>`;
   document.getElementById('login-screen').classList.add('visible');
-} else {
-  // Check if already authenticated this session
-  if (sessionStorage.getItem('gp_auth') === CONFIG.familyCode) {
-    showPlanner();
-  }
-  // Otherwise login screen is already visible
+} else if (sessionStorage.getItem('gp_auth') === CONFIG.familyCode) {
+  showPlanner();
 }
 </script>
 </body>

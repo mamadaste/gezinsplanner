@@ -276,6 +276,15 @@ select:focus, input:focus { outline:none; border-color:var(--accent); box-shadow
 }
 .login-btn:active { transform: translateY(0); }
 
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  20%      { transform: translateX(-8px); }
+  40%      { transform: translateX(8px); }
+  60%      { transform: translateX(-6px); }
+  80%      { transform: translateX(4px); }
+}
+.login-input.shake { animation: shake .4s ease; }
+
 .login-error {
   display: none;
   font-size: .76rem; font-weight: 500;
@@ -284,6 +293,7 @@ select:focus, input:focus { outline:none; border-color:var(--accent); box-shadow
   border: 1px solid #FECACA;
   border-radius: 8px;
   padding: 8px 12px;
+  margin-top: 4px;
 }
 
 </style>
@@ -343,9 +353,9 @@ select:focus, input:focus { outline:none; border-color:var(--accent); box-shadow
     <div class="login-input-wrap">
       <div class="login-input-icon">🔑</div>
       <input type="password" id="code-input" class="login-input" placeholder="Gezinscode invoeren…"
-        onkeydown="if(event.key==='Enter')checkCode()">
+        id="code-input-field">
     </div>
-    <button class="login-btn" onclick="checkCode()">
+    <button class="login-btn" id="login-btn">
       Doorgaan
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
@@ -560,8 +570,7 @@ function render() {
           tips.push((ev.note||TYPE_LABELS[ev.type])+(ev.start!==ev.end?` (${fmtShort(ev.start)}–${fmtShort(ev.end)})`:''));
           cell.appendChild(chip);
         });
-        if(tips.length){const tip=document.createElement('div');tip.className='cell-tooltip';tip.textContent=tips.join('
-');cell.appendChild(tip);}
+        if(tips.length){const tip=document.createElement('div');tip.className='cell-tooltip';tip.textContent=tips.join('\n');cell.appendChild(tip);}
         row.appendChild(cell);
       });
       card.appendChild(row);
@@ -649,15 +658,31 @@ function clearAll() {
 
 // ── LOGIN ─────────────────────────────────────────────────────────
 function checkCode() {
-  const input = document.getElementById('code-input').value.trim();
-  document.getElementById('code-input').classList.remove('error');
+  const inputEl = document.getElementById('code-input');
+  const input = inputEl.value.trim();
+  inputEl.classList.remove('error', 'shake');
+
   if (input === CONFIG.familyCode) {
     sessionStorage.setItem('gp_auth', CONFIG.familyCode);
     showPlanner();
   } else {
-    document.getElementById('code-error').style.display = 'block';
-    document.getElementById('code-input').classList.add('error');
+    const errorEl = document.getElementById('code-error');
+    errorEl.style.display = 'block';
+    inputEl.classList.add('error');
+    // Trigger shake — remove and re-add to restart animation
+    void inputEl.offsetWidth;
+    inputEl.classList.add('shake');
+    inputEl.focus();
+    // Auto-hide error after 4 seconds
+    setTimeout(() => { errorEl.style.display = 'none'; }, 4000);
   }
+}
+
+function attachLoginListeners() {
+  const btn = document.getElementById('login-btn');
+  const inp = document.getElementById('code-input');
+  if (btn) btn.addEventListener('click', checkCode);
+  if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter') checkCode(); });
 }
 
 function showPlanner() {
@@ -687,6 +712,9 @@ if (!CONFIG.familyCode || !CONFIG.jsonBinKey || !CONFIG.jsonBinId
   document.getElementById('login-screen').classList.add('visible');
 } else if (sessionStorage.getItem('gp_auth') === CONFIG.familyCode) {
   showPlanner();
+} else {
+  // Attach login button listeners after DOM is ready
+  attachLoginListeners();
 }
 </script>
 </body>

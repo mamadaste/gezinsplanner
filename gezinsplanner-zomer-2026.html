@@ -414,42 +414,6 @@ select:focus, input:focus { outline:none; border-color:var(--accent); box-shadow
 }
 
 
-/* ── SPANNING BARS (meerdaagse events) ── */
-.person-row { position: relative; }
-
-.span-bar {
-  position: absolute;
-  /* Grid: col 1 = label (108px), cols 2-8 = days (each 1fr) */
-  /* We calculate left/width after render using JS grid positions */
-  height: 18px;
-  top: calc(4px + (var(--ev-idx, 0) * 22px));
-  pointer-events: auto;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 6px;
-  overflow: hidden;
-  opacity: .92;
-  transition: opacity .15s, filter .15s;
-  z-index: 2;
-}
-.span-bar:hover { opacity: 1; filter: brightness(1.08); }
-
-.span-bar-icon { font-size: .6rem; line-height: 1; flex-shrink: 0; }
-.span-bar-label {
-  font-size: .6rem; font-weight: 700;
-  color: #fff;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  line-height: 1;
-}
-
-/* Cells need extra top padding to not overlap with bars */
-.cell {
-  padding-top: 4px;
-}
-
 </style>
 </head>
 <body>
@@ -708,8 +672,6 @@ function render() {
     }
 
     const card=document.createElement('div'); card.className='wk-card';
-
-    // Week header
     const hdrRow=document.createElement('div'); hdrRow.className='wk-hdr-row';
     hdrRow.innerHTML=`<div class="wk-num-cell"><div class="wk-badge">WK ${wk}</div><div class="wk-sub">${fmtShort(dayStrs[0])} – ${fmtShort(dayStrs[6])}</div></div>`;
     days.forEach(d=>{
@@ -718,61 +680,46 @@ function render() {
     });
     card.appendChild(hdrRow);
 
-    // Person rows
     names.forEach((name,pi)=>{
-      // Collect all events for this person that touch this week
-      const weekEvs = events.filter(ev => {
-        if (!ev.persons.includes(pi)) return false;
-        // overlaps this week
-        return ev.end >= dayStrs[0] && ev.start <= dayStrs[6];
-      });
+      const row=document.createElement('div'); row.className='person-row';
+      row.innerHTML=`<div class="row-lbl"><div class="color-pip" style="background:${PERSON_COLORS[pi]}"></div>${name}</div>`;
 
-      // Separate single-day and multi-day events
-      const singleEvs = weekEvs.filter(ev => ev.start === ev.end);
-      const multiEvs  = weekEvs.filter(ev => ev.start !== ev.end);
-
-      // Build row wrapper (position:relative for overlay bars)
-      const row = document.createElement('div');
-      row.className = 'person-row';
-      row.style.position = 'relative';
-
-      // Label cell
-      row.innerHTML = `<div class="row-lbl"><div class="color-pip" style="background:${PERSON_COLORS[pi]}"></div>${name}</div>`;
-
-      // 7 clickable day cells (for single-day events + click targets)
       days.forEach(d=>{
         const ds=dateStr(d); const dow=d.getDay();
         const cell=document.createElement('div');
         cell.className=`cell${(dow===0||dow===6)?' wknd':''}${d.getDate()===1?' new-mo':''}`;
         cell.onclick=()=>openModal(ds);
 
-        // Single-day events in this cell
-        const daySingles = singleEvs.filter(ev=>ev.start===ds);
+        const evs=eventsOnDate(ds).filter(ev=>ev.persons.includes(pi));
         const tips=[];
-        daySingles.forEach(ev=>{
+
+        evs.forEach(ev=>{
           const chip=document.createElement('div');
-          chip.className='chip range-only';
+          const cc=chipClass(ev,ds);
+          chip.className=`chip ${cc}`;
           chip.style.background=TYPE_COLORS[ev.type]||'#888';
+
+          // Show label on every day of the event
           chip.style.height='auto';
-          chip.style.borderRadius='4px';
+          chip.style.borderRadius= cc==='range-start'?'4px 2px 2px 4px': cc==='range-end'?'2px 4px 4px 2px': cc==='range-mid'?'2px':'4px';
           chip.style.padding='2px 4px';
           chip.style.display='flex';
           chip.style.alignItems='center';
           chip.style.gap='3px';
           chip.style.overflow='hidden';
-          const icon=TYPE_ICONS[ev.type]||'•';
-          const label=ev.note||TYPE_LABELS[ev.type]||'';
-          chip.innerHTML=`<span style="font-size:.6rem;line-height:1">${icon}</span><span style="font-size:.6rem;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52px;line-height:1.3;font-family:Plus Jakarta Sans,sans-serif">${label}</span>`;
-          tips.push(label);
-          cell.appendChild(chip);
-        });
+          chip.style.opacity= cc==='range-mid'?'0.85':'1';
 
-        // Space placeholder for multi-day events (keeps cell height consistent)
-        multiEvs.forEach(()=>{
-          const spacer=document.createElement('div');
-          spacer.style.height='18px';
-          spacer.style.flexShrink='0';
-          cell.appendChild(spacer);
+          const icon=TYPE_ICONS[ev.type]||'•';
+          // Only show label on first visible day of range within this week,
+          // or on every day if it fits
+          const isFirstVisible = cc==='range-only' || cc==='range-start' || (cc==='range-mid' && ds===dayStrs[0]);
+          const label = isFirstVisible ? (ev.note||TYPE_LABELS[ev.type]||'') : '';
+
+          chip.innerHTML=`<span style="font-size:.6rem;line-height:1;flex-shrink:0">${icon}</span>`
+            +(label?`<span style="font-size:.6rem;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px;line-height:1.3;font-family:Plus Jakarta Sans,sans-serif">${label}</span>`:'');
+
+          tips.push((ev.note||TYPE_LABELS[ev.type])+(ev.start!==ev.end?` (${fmtShort(ev.start)}–${fmtShort(ev.end)})`:''));
+          cell.appendChild(chip);
         });
 
         if(tips.length){const tip=document.createElement('div');tip.className='cell-tooltip';tip.textContent=tips.join('\n');cell.appendChild(tip);}
@@ -780,86 +727,10 @@ function render() {
       });
 
       card.appendChild(row);
-
-      // Draw spanning bars for multi-day events AFTER row is in DOM
-      // We use a post-render approach with requestAnimationFrame
-      if (multiEvs.length > 0) {
-        multiEvs.forEach((ev, evIdx) => {
-          // Find start col and end col within this week (clamped)
-          const barStart = Math.max(dayStrs.indexOf(ev.start), 0);
-          const barStartClamped = ev.start < dayStrs[0] ? 0 : dayStrs.indexOf(ev.start);
-          const barEnd   = ev.end > dayStrs[6] ? 6 : dayStrs.indexOf(ev.end);
-
-          const colStart = barStartClamped === -1 ? 0 : barStartClamped;
-          const colEnd   = barEnd === -1 ? 6 : barEnd;
-
-          const isStartOfEvent = ev.start >= dayStrs[0];
-          const isEndOfEvent   = ev.end <= dayStrs[6];
-
-          // Create overlay bar element
-          const bar = document.createElement('div');
-          bar.className = 'span-bar';
-          bar.style.background = TYPE_COLORS[ev.type]||'#888';
-          bar.style.borderRadius = `${isStartOfEvent?'5px':'0'} ${isEndOfEvent?'5px':'0'} ${isEndOfEvent?'5px':'0'} ${isStartOfEvent?'5px':'0'}`;
-          bar.dataset.evId = ev.id;
-          bar.title = (ev.note||TYPE_LABELS[ev.type]) + ` (${fmtShort(ev.start)}–${fmtShort(ev.end)})`;
-          bar.onclick = (e) => { e.stopPropagation(); openModal(ev.start >= dayStrs[0] ? ev.start : dayStrs[0]); };
-
-          // Label on bar
-          const icon  = TYPE_ICONS[ev.type]||'';
-          const label = ev.note || TYPE_LABELS[ev.type] || '';
-          bar.innerHTML = `<span class="span-bar-icon">${icon}</span><span class="span-bar-label">${label}</span>`;
-
-          // Position: use CSS custom properties referencing grid columns
-          // col 1 = label, cols 2-8 = days
-          bar.style.setProperty('--col-start', colStart + 2); // +2 because col1=label
-          bar.style.setProperty('--col-span',  colEnd - colStart + 1);
-          bar.style.setProperty('--ev-idx', evIdx);
-
-          row.appendChild(bar);
-        });
-      }
     });
-
     container.appendChild(card);
   }
 }
-
-
-// ── POSITION SPANNING BARS ────────────────────────────────────────
-// Runs after DOM update to calculate pixel positions from actual cell widths
-function positionSpanBars() {
-  document.querySelectorAll('.person-row').forEach(row => {
-    const bars = row.querySelectorAll('.span-bar');
-    if (!bars.length) return;
-
-    // Get all cells (skip label cell = first child div.row-lbl)
-    const cells = [...row.querySelectorAll('.cell')];
-    if (!cells.length) return;
-
-    const rowRect = row.getBoundingClientRect();
-
-    bars.forEach(bar => {
-      const colStart = parseInt(bar.style.getPropertyValue('--col-start')) - 2; // 0-indexed day
-      const colSpan  = parseInt(bar.style.getPropertyValue('--col-span'));
-      const colEnd   = colStart + colSpan - 1;
-
-      if (colStart < 0 || colStart >= cells.length) return;
-      const startCell = cells[Math.max(0, colStart)];
-      const endCell   = cells[Math.min(colEnd, cells.length-1)];
-
-      const startRect = startCell.getBoundingClientRect();
-      const endRect   = endCell.getBoundingClientRect();
-
-      const left  = startRect.left - rowRect.left;
-      const width = endRect.right - startRect.left - 3; // 3px gap
-
-      bar.style.left  = left + 2 + 'px';
-      bar.style.width = width - 4 + 'px';
-    });
-  });
-}
-
 // ── MODAL ─────────────────────────────────────────────────────────
 function openModal(ds) {
   modalDate=ds; const d=parseDate(ds);
@@ -1025,8 +896,6 @@ function checkCode() {
     setTimeout(() => { errorEl.style.display = 'none'; }, 4000);
   }
 }
-
-window.addEventListener("resize", positionSpanBars);
 
 function attachLoginListeners() {
   const btn = document.getElementById('login-btn');

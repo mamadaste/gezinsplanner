@@ -8,6 +8,6 @@ window.GP_CONFIG = {
 
   // Kies een wachtwoord voor het gezin
   // Deel dit via WhatsApp — alleen wie dit weet kan de planner zien
-  familyCode: 'KIES_EEN_CODE',
+  familyCode: 'sandy2STALK9realizes*sword',
 
 };
